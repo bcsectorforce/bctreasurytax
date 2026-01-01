@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>BC Treasury Tax</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+:root {
+  --bg-main:#070b18;--bg-panel:#0e1533;--bg-panel-2:#131c44;
+  --accent:#4da6ff;--danger:#ff4d4d;--success:#4dff88;--warning:#ffd24d;
+  --text:#e6ecff;--muted:#9aa4d6;
+}
+*{box-sizing:border-box;font-family:system-ui}
+body{margin:0;background:radial-gradient(circle at top,#0b1230,var(--bg-main));color:var(--text)}
+#app{max-width:1300px;margin:auto;padding:20px}
+.hidden{display:none}
+.panel{background:linear-gradient(180deg,var(--bg-panel),var(--bg-panel-2));
+border-radius:14px;padding:16px;box-shadow:0 10px 30px rgba(0,0,0,.4)}
+.grid{display:grid;gap:16px}
+.grid-4{grid-template-columns:repeat(4,1fr)}
+.grid-3{grid-template-columns:repeat(3,1fr)}
+.grid-2{grid-template-columns:repeat(2,1fr)}
+button{border:none;border-radius:10px;padding:12px;font-weight:700;
+cursor:pointer;background:var(--accent);color:#000}
+button.success{background:var(--success)}
+button.warning{background:var(--warning)}
+button.danger{background:var(--danger)}
+input{width:100%;padding:10px;border-radius:8px;
+border:1px solid #26346a;background:#060b1f;color:var(--text)}
+.stat{font-size:26px;font-weight:800}
+.stat-label{font-size:12px;color:var(--muted)}
+#log{height:220px;overflow-y:auto;font-size:13px;background:#050817;border-radius:12px;padding:10px}
+.tax-box{background:#070c22;border-radius:12px;padding:14px}
+</style>
+</head>
+<body>
+
+<div id="app">
+<h1>🏛 BC Treasury Tax</h1>
+<p>File a correct tax return, then survive 15 more years.</p>
+
+<div id="management">
+  <div class="grid grid-4">
+    <div class="panel"><div class="stat-label">Budget</div><div class="stat" id="budget"></div></div>
+    <div class="panel"><div class="stat-label">World Rank</div><div class="stat" id="rank"></div></div>
+    <div class="panel"><div class="stat-label">Students</div><div class="stat" id="students"></div></div>
+    <div class="panel"><div class="stat-label">Year</div><div class="stat" id="turn"></div></div>
+  </div>
+
+  <br>
+
+  <div class="grid grid-3">
+    <button onclick="buildCampus()">Build Facility ($70k)</button>
+    <button onclick="hireFaculty()">Hire Faculty ($45k)</button>
+    <button onclick="expandDorms()">Expand Dorms ($35k)</button>
+    <button onclick="fundScholarships()">Scholarships ($30k)</button>
+    <button onclick="buyUtilities()">Utilities ($25k)</button>
+
+    <button onclick="buyTechnology()">Technology ($40k)</button>
+    <button onclick="buyInsurance()">Insurance ($30k)</button>
+    <button onclick="buyTransport()">Transportation ($35k)</button>
+    <button onclick="fundResearch()">Research ($50k)</button>
+
+    <button class="success" onclick="nextTurn()">Advance Year</button>
+  </div>
+
+  <br>
+  <div class="panel" id="log"></div>
+</div>
+
+<div id="taxPhase" class="hidden">
+  <h2>📄 Tax Return</h2>
+  <div class="grid grid-2">
+    <div class="tax-box">
+      <h3>Payment History</h3>
+      <div id="paymentHistory"></div>
+    </div>
+    <div class="tax-box">
+      <label>Total Income</label><input id="income" type="number">
+      <label>Total Expenses</label><input id="deduction" type="number">
+      <label>Property Tax</label><input id="propertyTax" type="number">
+      <label>Credits</label><input id="credits" type="number">
+      <br><br>
+      <button onclick="fileTaxes()">File Return</button>
+      <div id="taxResult"></div>
+      <button id="nextYearBtn" class="success hidden" onclick="startNextYear()">Proceed to Next Year</button>
+    </div>
+  </div>
+</div>
+</div>
+
+<script>
+const state={
+  budget:400000,rank:3.0,students:12000,
+  turn:1,yearsSurvived:0,targetYears:15,
+  paymentHistory:[],totalExpenses:0,
+  insurance:0
+};
+
+const penaltyScale=0.5;
+
+function log(msg){
+  const d=document.getElementById('log');
+  d.innerHTML+=`<div>${msg}</div>`;
+  d.scrollTop=d.scrollHeight;
+}
+
+function spend(cost,msg,cat){
+  if(state.budget<cost){log("❌ Not enough funds");return false;}
+  state.budget-=cost;state.totalExpenses+=cost;
+  state.paymentHistory.push({year:state.yearsSurvived,cat,amount:cost});
+  log(`✔️ ${msg} (-$${cost.toLocaleString()})`);
+  updateUI();return true;
+}
+
+// ORIGINAL ACTIONS
+function buildCampus(){if(spend(70000,"Facility built","Capital"))state.rank-=0.2;}
+function hireFaculty(){if(spend(45000,"Faculty hired","Payroll"))state.rank-=0.15;}
+function expandDorms(){if(spend(35000,"Dorms expanded","Housing"))state.students+=800;}
+function fundScholarships(){if(spend(30000,"Scholarships funded","Scholarships"))state.rank-=0.1;}
+function buyUtilities(){spend(25000,"Utilities secured","Operations");}
+
+// NEW ASSETS
+function buyTechnology(){if(spend(40000,"Technology upgraded","Technology")){state.students+=600;state.rank-=0.12;}}
+function buyInsurance(){if(spend(30000,"Insurance purchased","Insurance"))state.insurance+=1;}
+function buyTransport(){if(spend(35000,"Transportation expanded","Transport"))state.students+=500;}
+function fundResearch(){if(spend(50000,"Research funded","Research"))state.rank-=0.25;}
+
+function nextTurn(){
+  if(Math.random()<0.35){
+    let loss=25000;
+    if(state.insurance>0)loss*=0.5;
+    state.budget-=loss;
+    log(`⚠️ Emergency expense -$${loss}`);
+  }
+  state.turn++;
+  updateUI();
+  if(state.turn>6)endManagement();
+}
+
+function endManagement(){
+  management.classList.add("hidden");
+  taxPhase.classList.remove("hidden");
+  paymentHistory.innerHTML=state.paymentHistory.map(
+    p=>`Year ${p.year}: ${p.cat} - $${p.amount.toLocaleString()}`
+  ).join("<br>");
+}
+
+function fileTaxes(){
+  const incomeVal = +document.getElementById("income").value;
+  const expVal = +document.getElementById("deduction").value;
+  const propertyTaxVal = +document.getElementById("propertyTax").value;
+  const creditsVal = +document.getElementById("credits").value;
+
+  const taxResult = document.getElementById("taxResult");
+  const nextYearBtn = document.getElementById("nextYearBtn");
+
+  if(expVal !== state.totalExpenses){
+    taxResult.innerHTML =
+      "<span style='color:var(--danger)'>❌ Wrong expense total</span>";
+    return;
+  }
+
+  const taxable = Math.max(0, incomeVal - expVal);
+  let tax = taxable * 0.21 + propertyTaxVal - creditsVal;
+
+  if(tax > 0){
+    const penalty = tax * penaltyScale;
+    state.budget -= penalty;
+    taxResult.innerHTML =
+      `❌ Tax owed: $${tax.toFixed(2)}<br>Budget penalty: -$${penalty.toFixed(2)}`;
+  } else {
+    state.budget += Math.abs(tax);
+    taxResult.innerHTML =
+      `✔️ Correct math / refund: $${Math.abs(tax).toFixed(2)}`;
+  }
+
+  nextYearBtn.classList.remove("hidden");
+  updateUI();
+}
+
+function startNextYear(){
+  state.yearsSurvived++;
+  if(state.yearsSurvived>=state.targetYears){
+    alert("🏆 YOU WIN — 15 YEARS SURVIVED");
+    location.reload();
+  }
+  state.turn=1;
+  state.totalExpenses=0;
+  state.paymentHistory=[];
+  taxPhase.classList.add("hidden");
+  management.classList.remove("hidden");
+  updateUI();
+}
+
+function updateUI(){
+  budget.textContent="$"+state.budget.toLocaleString();
+  rank.textContent=state.rank.toFixed(2);
+  students.textContent=state.students.toLocaleString();
+  turn.textContent=state.yearsSurvived+1;
+}
+updateUI();log("🏁 University founded");
+</script>
+</body>
+</html>
