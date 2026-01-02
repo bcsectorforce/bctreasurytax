@@ -91,7 +91,7 @@ border:1px solid #26346a;background:#060b1f;color:var(--text)}
 
 <script>
 const state={
-  budget:400000,rank:3.0,students:12000,
+  budget:400000,rank:3.0,students:12000,scholarshipSpent: 0,
   turn:1,yearsSurvived:0,targetYears:15,
   paymentHistory:[],totalExpenses:0,
   insurance:0
@@ -117,7 +117,13 @@ function spend(cost,msg,cat){
 function buildCampus(){if(spend(70000,"Facility built","Capital"))state.rank-=0.2;}
 function hireFaculty(){if(spend(45000,"Faculty hired","Payroll"))state.rank-=0.15;}
 function expandDorms(){if(spend(35000,"Dorms expanded","Housing"))state.students+=800;}
-function fundScholarships(){if(spend(30000,"Scholarships funded","Scholarships"))state.rank-=0.1;}
+function fundScholarships(){
+  if(spend(30000,"Scholarships funded","Scholarships")){
+    state.rank -= 0.1;
+    state.scholarshipSpent += 30000;
+  }
+}
+
 function buyUtilities(){spend(25000,"Utilities secured","Operations");}
 
 // NEW ASSETS
@@ -150,35 +156,50 @@ function fileTaxes(){
   const incomeVal = +document.getElementById("income").value;
   const expVal = +document.getElementById("deduction").value;
   const propertyTaxVal = +document.getElementById("propertyTax").value;
-  const creditsVal = +document.getElementById("credits").value;
 
   const taxResult = document.getElementById("taxResult");
   const nextYearBtn = document.getElementById("nextYearBtn");
 
+  // 1️⃣ Validate expenses
   if(expVal !== state.totalExpenses){
     taxResult.innerHTML =
       "<span style='color:var(--danger)'>❌ Wrong expense total</span>";
     return;
   }
 
-  const taxable = Math.max(0, incomeVal - expVal);
-  let tax = taxable * 0.21 + propertyTaxVal - creditsVal;
+  // 2️⃣ Scholarship-based tax credits (ADD HERE)
+  const scholarshipCredits = Math.min(state.scholarshipSpent * 0.10, 5000);
 
+  // 3️⃣ Taxable income calculation
+  let taxable = Math.max(0, incomeVal - expVal);
+
+  // 4️⃣ Nonprofit tuition exemption (ADD HERE)
+  if(incomeVal <= state.students * 15000){
+    taxable = 0;
+  }
+
+  // 5️⃣ Final tax math
+  let tax = taxable * 0.21 + propertyTaxVal - scholarshipCredits;
+
+  // 6️⃣ Apply result
   if(tax > 0){
     const penalty = tax * penaltyScale;
     state.budget -= penalty;
     taxResult.innerHTML =
-      `❌ Tax owed: $${tax.toFixed(2)}<br>Budget penalty: -$${penalty.toFixed(2)}`;
+      `❌ Tax owed: $${tax.toFixed(2)}<br>
+       Scholarship credit: -$${scholarshipCredits.toFixed(2)}<br>
+       Budget penalty: -$${penalty.toFixed(2)}`;
   } else {
     state.budget += Math.abs(tax);
     taxResult.innerHTML =
-      `✔️ Correct math / refund: $${Math.abs(tax).toFixed(2)}`;
+      `✔️ Correct return<br>
+       Scholarship credit: $${scholarshipCredits.toFixed(2)}<br>
+       Refund: $${Math.abs(tax).toFixed(2)}`;
   }
 
   nextYearBtn.classList.remove("hidden");
   updateUI();
 }
-
 function startNextYear(){
   state.yearsSurvived++;
   if(state.yearsSurvived>=state.targetYears){
