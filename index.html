@@ -97,6 +97,9 @@ const state={
   insurance:0
 };
 
+let baseBudget = 400000; 
+let lastRefund = 0;      
+
 const penaltyScale=0.5;
 
 function log(msg){
@@ -113,7 +116,7 @@ function spend(cost,msg,cat){
   updateUI();return true;
 }
 
-// ORIGINAL ACTIONS
+// ACTIONS
 function buildCampus(){if(spend(70000,"Facility built","Capital"))state.rank-=0.2;}
 function hireFaculty(){if(spend(45000,"Faculty hired","Payroll"))state.rank-=0.15;}
 function expandDorms(){if(spend(35000,"Dorms expanded","Housing"))state.students+=800;}
@@ -123,10 +126,7 @@ function fundScholarships(){
     state.scholarshipSpent += 30000;
   }
 }
-
 function buyUtilities(){spend(25000,"Utilities secured","Operations");}
-
-// NEW ASSETS
 function buyTechnology(){if(spend(40000,"Technology upgraded","Technology")){state.students+=600;state.rank-=0.12;}}
 function buyInsurance(){if(spend(30000,"Insurance purchased","Insurance"))state.insurance+=1;}
 function buyTransport(){if(spend(35000,"Transportation expanded","Transport"))state.students+=500;}
@@ -156,51 +156,65 @@ function fileTaxes(){
   const incomeVal = +document.getElementById("income").value;
   const expVal = +document.getElementById("deduction").value;
   const propertyTaxVal = +document.getElementById("propertyTax").value;
+  const creditsVal = +document.getElementById("credits").value;
 
   const taxResult = document.getElementById("taxResult");
   const nextYearBtn = document.getElementById("nextYearBtn");
 
-  // 1️⃣ Validate expenses
-  if(expVal !== state.totalExpenses){
+  // 1️⃣ Computer-calculated correct values
+  const correctExpenses = state.totalExpenses;
+  const scholarshipCredits = Math.min(state.scholarshipSpent * 0.10, 5000);
+  const totalHousing = state.paymentHistory
+    .filter(p => p.cat === "Housing")
+    .reduce((sum, p) => sum + p.amount, 0);
+  const totalCapital = state.paymentHistory
+    .filter(p => p.cat === "Capital")
+    .reduce((sum, p) => sum + p.amount, 0);
+  const propertyValue = totalHousing + totalCapital;
+  const correctPropertyTax = +(propertyValue * 0.12).toFixed(2);
+
+  // 2️⃣ Validate all inputs
+  if(expVal !== correctExpenses || propertyTaxVal !== correctPropertyTax || creditsVal !== scholarshipCredits){
     taxResult.innerHTML =
-      "<span style='color:var(--danger)'>❌ Wrong expense total</span>";
+      "<span style='color:var(--danger)'>❌ Wrong expense total or tax inputs</span>";
     return;
   }
 
-  // 2️⃣ Scholarship-based tax credits (ADD HERE)
-  const scholarshipCredits = Math.min(state.scholarshipSpent * 0.10, 5000);
-
   // 3️⃣ Taxable income calculation
   let taxable = Math.max(0, incomeVal - expVal);
+  if(incomeVal <= state.students * 15000) taxable = 0;
 
-  // 4️⃣ Nonprofit tuition exemption (ADD HERE)
-  if(incomeVal <= state.students * 15000){
-    taxable = 0;
-  }
-
-  // 5️⃣ Final tax math
+  // 4️⃣ Final tax math
   let tax = taxable * 0.21 + propertyTaxVal - scholarshipCredits;
 
-  // 6️⃣ Apply result
+  // 5️⃣ Apply result
   if(tax > 0){
     const penalty = tax * penaltyScale;
-    state.budget -= penalty;
+    lastRefund = -penalty;
     taxResult.innerHTML =
       `❌ Tax owed: $${tax.toFixed(2)}<br>
        Scholarship credit: -$${scholarshipCredits.toFixed(2)}<br>
        Budget penalty: -$${penalty.toFixed(2)}`;
   } else {
-    state.budget += Math.abs(tax);
+    lastRefund = Math.abs(tax);
     taxResult.innerHTML =
       `✔️ Correct return<br>
        Scholarship credit: $${scholarshipCredits.toFixed(2)}<br>
        Refund: $${Math.abs(tax).toFixed(2)}`;
   }
 
+  // ✅ Only now show "Proceed to Next Year"
   nextYearBtn.classList.remove("hidden");
   updateUI();
 }
+
 function startNextYear(){
+  const nextYearBtn = document.getElementById("nextYearBtn");
+  if(nextYearBtn.classList.contains("hidden")){
+    alert("⚠️ You must file your tax return first!");
+    return; // stop proceeding to next year
+  }
+
   state.yearsSurvived++;
   if(state.yearsSurvived>=state.targetYears){
     alert("🏆 YOU WIN — 15 YEARS SURVIVED");
@@ -211,6 +225,12 @@ function startNextYear(){
   state.paymentHistory=[];
   taxPhase.classList.add("hidden");
   management.classList.remove("hidden");
+
+  state.budget = baseBudget + lastRefund;
+  if(state.budget < 0) state.budget = 0;
+  lastRefund = 0;
+
+  log(`💰 New Year Budget: $${state.budget.toLocaleString()}`);
   updateUI();
 }
 
